@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RegisterRequest } from './dto/register.dto';
@@ -10,7 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './interfaces/jwt.interface';
 import { LoginRequest } from './dto/login.dto';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { isDev } from 'src/utils/is-Dev.util';
 
 @Injectable()
@@ -36,7 +37,7 @@ export class AuthService {
   }
 
   async register(res: Response, dto: RegisterRequest) {
-    const { login, email, password, age } = dto;
+    const { login, email, password, age, description } = dto;
 
     const existUser = await this.prismaService.user.findFirst({
       where: {
@@ -54,6 +55,7 @@ export class AuthService {
         email,
         password: await hash(password),
         age,
+        description,
       },
     });
 
@@ -86,6 +88,12 @@ export class AuthService {
     return this.auth(res, user.id);
   }
 
+  async logout(res: Response) {
+    this.setCookie(res, 'refreshToken', new Date(0));
+
+    return true;
+  }
+
   private auth(res: Response, id: string) {
     const { accessToken, refreshToken } = this.generateTokens(id);
 
@@ -109,6 +117,33 @@ export class AuthService {
       refreshToken,
       accessToken,
     };
+  }
+
+  async refresh(req: Request, res: Response) {
+    const refreshToken = req.cookies['refreshToken'];
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const payload: JwtPayload = await this.jwtService.verifyAsync(refreshToken);
+
+    if (payload) {
+      const user = await this.prismaService.user.findUnique({
+        where: {
+          id: payload.id,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      return this.auth(res, user.id);
+    }
   }
 
   private setCookie(res: Response, value: string, expires: Date) {
