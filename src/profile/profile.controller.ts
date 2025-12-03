@@ -9,7 +9,7 @@ import {
 import { ProfileService } from './profile.service';
 import type { Request } from 'express';
 import { Authorization } from 'src/auth/decorators/authorization.decorator';
-import { PaginationDto } from './dto/pagination';
+import { GetUsersDto } from './dto/get-users.dto';
 
 @Controller('profile')
 export class ProfileController {
@@ -25,7 +25,7 @@ export class ProfileController {
   @Authorization()
   @Get('get-all-users')
   @HttpCode(HttpStatus.OK)
-  async getAllUsers(@Query() paginationDto: PaginationDto) {
-    return this.profileService.getAllUsers(paginationDto);
+  async getAllUsers(@Query() getUsersDto: GetUsersDto) {
+    return this.profileService.getAllUsers(getUsersDto);
   }
 }
