@@ -5,14 +5,13 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterRequest } from './dto/register.dto';
 import { LoginRequest } from './dto/login.dto';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -25,6 +24,8 @@ import { AuthResponse } from './dto/auth.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { isDevEnvironment } from 'src/utils/isDevEnvironment.util';
+import { ReqField } from 'src/common/decorators/req-field.decorator';
+import type { RequestUser } from './interfaces/user.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -85,10 +86,9 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
-    @Req() req: Request,
+    @ReqField('cookies.refreshToken') refreshToken: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = req.cookies['refreshToken'];
     const { accessToken, refreshToken: newRefreshToken } =
       await this.authService.refresh(refreshToken);
     this.setCookie(res, newRefreshToken, this.getRefreshTokenExpirationDate());
@@ -124,7 +124,7 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   @Get('me')
   @HttpCode(HttpStatus.OK)
-  async me(@Req() req: Request) {
-    return req.user;
+  async me(@ReqField('user') user: RequestUser) {
+    return user;
   }
 }

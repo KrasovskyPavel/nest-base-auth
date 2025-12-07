@@ -4,7 +4,6 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { RegisterRequest } from './dto/register.dto';
-import { Response, Request } from 'express';
 import {
   ConflictException,
   NotFoundException,
@@ -78,10 +77,6 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    const mockResponse = {
-      cookie: jest.fn(),
-    } as unknown as Response;
-
     const mockDto: RegisterRequest = {
       login: 'testuser',
       email: 'test@example.com',
@@ -112,9 +107,12 @@ describe('AuthService', () => {
         .mockReturnValueOnce('access-token-123')
         .mockReturnValueOnce('refresh-token-456');
 
-      const result = await service.register(mockResponse, mockDto);
+      const result = await service.register(mockDto);
 
-      expect(result).toEqual({ accessToken: 'access-token-123' });
+      expect(result).toEqual({
+        accessToken: 'access-token-123',
+        refreshToken: 'refresh-token-456',
+      });
 
       expect(prismaService.user.findFirst).toHaveBeenCalledWith({
         where: {
@@ -133,15 +131,6 @@ describe('AuthService', () => {
       });
 
       expect(jwtService.sign).toHaveBeenCalledTimes(2);
-
-      expect(mockResponse.cookie).toHaveBeenCalledWith(
-        'refreshToken',
-        'refresh-token-456',
-        expect.objectContaining({
-          httpOnly: true,
-          domain: 'localhost',
-        }),
-      );
     });
 
     it('should throw ConflictException if user already exists', async () => {
@@ -152,11 +141,11 @@ describe('AuthService', () => {
       };
       mockPrismaService.user.findFirst.mockResolvedValue(existingUser);
 
-      await expect(service.register(mockResponse, mockDto)).rejects.toThrow(
+      await expect(service.register(mockDto)).rejects.toThrow(
         ConflictException,
       );
 
-      await expect(service.register(mockResponse, mockDto)).rejects.toThrow(
+      await expect(service.register(mockDto)).rejects.toThrow(
         'User already exist',
       );
 
@@ -165,10 +154,6 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    const mockResponse = {
-      cookie: jest.fn(),
-    } as unknown as Response;
-
     const mockDto: LoginRequest = {
       identifier: 'testuser',
       password: '123asdf',
@@ -188,9 +173,12 @@ describe('AuthService', () => {
         .mockReturnValueOnce('access-token-123')
         .mockReturnValueOnce('refresh-token-456');
 
-      const result = await service.login(mockResponse, mockDto);
+      const result = await service.login(mockDto);
 
-      expect(result).toEqual({ accessToken: 'access-token-123' });
+      expect(result).toEqual({
+        accessToken: 'access-token-123',
+        refreshToken: 'refresh-token-456',
+      });
 
       expect(prismaService.user.findFirst).toHaveBeenCalledWith({
         where: {
@@ -208,27 +196,14 @@ describe('AuthService', () => {
       );
 
       expect(jwtService.sign).toHaveBeenCalledTimes(2);
-
-      expect(mockResponse.cookie).toHaveBeenCalledWith(
-        'refreshToken',
-        'refresh-token-456',
-        expect.objectContaining({
-          httpOnly: true,
-          domain: 'localhost',
-        }),
-      );
     });
 
     it('should throw NotFoundException if user not found', async () => {
       mockPrismaService.user.findFirst.mockResolvedValue(null);
 
-      await expect(service.login(mockResponse, mockDto)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.login(mockDto)).rejects.toThrow(NotFoundException);
 
-      await expect(service.login(mockResponse, mockDto)).rejects.toThrow(
-        'User not found',
-      );
+      await expect(service.login(mockDto)).rejects.toThrow('User not found');
 
       expect(argon2.verify).not.toHaveBeenCalled();
     });
@@ -238,11 +213,9 @@ describe('AuthService', () => {
 
       (argon2.verify as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.login(mockResponse, mockDto)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.login(mockDto)).rejects.toThrow(NotFoundException);
 
-      await expect(service.login(mockResponse, mockDto)).rejects.toThrow(
+      await expect(service.login(mockDto)).rejects.toThrow(
         'Invalid credentials',
       );
 
@@ -256,25 +229,10 @@ describe('AuthService', () => {
   });
 
   describe('logout', () => {
-    it('should logout user and clear refresh token cookie', async () => {
-      const mockResponse = {
-        cookie: jest.fn(),
-      } as unknown as Response;
-
-      const result = await service.logout(mockResponse);
+    it('should logout user successfully', async () => {
+      const result = await service.logout();
 
       expect(result).toBe(true);
-      expect(mockResponse.cookie).toHaveBeenCalledWith(
-        'refreshToken',
-        'refreshToken',
-        expect.objectContaining({
-          httpOnly: true,
-          domain: 'localhost',
-          expires: new Date(0),
-          secure: true,
-          sameSite: 'lax',
-        }),
-      );
     });
   });
 
@@ -317,15 +275,7 @@ describe('AuthService', () => {
   });
 
   describe('refresh', () => {
-    const mockRequest = {
-      cookies: {
-        refreshToken: 'valid-refresh-token',
-      },
-    } as any as Request;
-
-    const mockResponse = {
-      cookie: jest.fn(),
-    } as unknown as Response;
+    const mockRefreshToken = 'valid-refresh-token';
 
     const mockPayload = {
       id: 'user-id-123',
@@ -342,9 +292,12 @@ describe('AuthService', () => {
         .mockReturnValueOnce('new-access-token')
         .mockReturnValueOnce('new-refresh-token');
 
-      const result = await service.refresh(mockRequest, mockResponse);
+      const result = await service.refresh(mockRefreshToken);
 
-      expect(result).toEqual({ accessToken: 'new-access-token' });
+      expect(result).toEqual({
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+      });
 
       expect(jwtService.verifyAsync).toHaveBeenCalledWith(
         'valid-refresh-token',
@@ -360,29 +313,14 @@ describe('AuthService', () => {
       });
 
       expect(jwtService.sign).toHaveBeenCalledTimes(2);
-
-      expect(mockResponse.cookie).toHaveBeenCalledWith(
-        'refreshToken',
-        'new-refresh-token',
-        expect.objectContaining({
-          httpOnly: true,
-          domain: 'localhost',
-        }),
-      );
     });
 
     it('should throw UnauthorizedException if refresh token is missing', async () => {
-      const requestWithoutToken = {
-        cookies: {},
-      } as any as Request;
+      await expect(service.refresh('')).rejects.toThrow(UnauthorizedException);
 
-      await expect(
-        service.refresh(requestWithoutToken, mockResponse),
-      ).rejects.toThrow(UnauthorizedException);
-
-      await expect(
-        service.refresh(requestWithoutToken, mockResponse),
-      ).rejects.toThrow('Invalid refresh token');
+      await expect(service.refresh('')).rejects.toThrow(
+        'Invalid refresh token',
+      );
 
       expect(jwtService.verifyAsync).not.toHaveBeenCalled();
     });
@@ -392,11 +330,11 @@ describe('AuthService', () => {
 
       mockPrismaService.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.refresh(mockRequest, mockResponse)).rejects.toThrow(
+      await expect(service.refresh(mockRefreshToken)).rejects.toThrow(
         NotFoundException,
       );
 
-      await expect(service.refresh(mockRequest, mockResponse)).rejects.toThrow(
+      await expect(service.refresh(mockRefreshToken)).rejects.toThrow(
         'User not found',
       );
 

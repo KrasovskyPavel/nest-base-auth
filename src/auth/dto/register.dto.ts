@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -46,7 +47,9 @@ export class RegisterRequest {
   @ApiProperty({
     description: 'Description about user',
     example: 'I am John Doe',
+    required: false,
   })
+  @IsOptional()
   @IsString({ message: 'Description must be a string' })
   description?: string;
 }

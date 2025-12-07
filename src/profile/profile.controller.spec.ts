@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
 import { GetUsersDto } from './dto/get-users.dto';
-import type { Request } from 'express';
 
 describe('ProfileController', () => {
   let controller: ProfileController;
@@ -16,6 +15,7 @@ describe('ProfileController', () => {
     id: '1',
     login: 'testuser',
     email: 'test@example.com',
+    password: 'hashed-password',
     age: 25,
     description: 'Test description',
     createdAt: new Date(),
@@ -44,31 +44,26 @@ describe('ProfileController', () => {
   });
 
   describe('me', () => {
-    it('should return user from request', async () => {
-      const mockRequest = {
-        user: mockUser,
-      } as unknown as Request;
-
-      const result = await controller.me(mockRequest);
+    it('should return user from ReqField decorator', async () => {
+      const result = await controller.me(mockUser);
 
       expect(result).toEqual(mockUser);
-      expect(result).toBe(mockRequest.user);
+      expect(result).toBe(mockUser);
     });
 
     it('should return user with all properties', async () => {
-      const mockRequest = {
-        user: {
-          id: '123',
-          login: 'john_doe',
-          email: 'john@example.com',
-          age: 30,
-          description: 'Software developer',
-          createdAt: new Date('2024-01-01'),
-          updatedAt: new Date('2024-01-02'),
-        },
-      } as unknown as Request;
+      const testUser = {
+        id: '123',
+        login: 'john_doe',
+        email: 'john@example.com',
+        password: 'hashed-password',
+        age: 30,
+        description: 'Software developer',
+        createdAt: new Date('2024-01-01'),
+        updatedAt: new Date('2024-01-02'),
+      };
 
-      const result = await controller.me(mockRequest);
+      const result = await controller.me(testUser);
 
       expect(result).toHaveProperty('id', '123');
       expect(result).toHaveProperty('login', 'john_doe');
