@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProfileService } from './profile.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { GetUsersDto } from './dto/get-users.dto';
-import { DEFAULT_PAGE_SIZE } from 'src/utils/constants';
+import { DEFAULT_PAGE_SIZE } from 'src/common/constants';
 
 describe('ProfileService', () => {
   let service: ProfileService;

@@ -11,15 +11,11 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './interfaces/jwt.interface';
 import { LoginRequest } from './dto/login.dto';
-import { Response, Request } from 'express';
-import { isDev } from 'src/utils/is-Dev.util';
 
 @Injectable()
 export class AuthService {
   private readonly JWT_ACCESS_TOKEN_TTL: string;
   private readonly JWT_REFRESH_TOKEN_TTL: string;
-
-  private readonly COOKIE_DOMAIN: string;
 
   constructor(
     private readonly prismaService: PrismaService,
@@ -32,11 +28,9 @@ export class AuthService {
     this.JWT_REFRESH_TOKEN_TTL = configService.getOrThrow<string>(
       'JWT_REFRESH_TOKEN_TTL',
     );
-
-    this.COOKIE_DOMAIN = configService.getOrThrow<string>('COOKIE_DOMAIN');
   }
 
-  async register(res: Response, dto: RegisterRequest) {
+  async register(dto: RegisterRequest) {
     const { login, email, password, age, description } = dto;
 
     const existUser = await this.prismaService.user.findFirst({
@@ -59,10 +53,10 @@ export class AuthService {
       },
     });
 
-    return this.auth(res, user.id);
+    return this.generateTokens(user.id);
   }
 
-  async login(res: Response, dto: LoginRequest) {
+  async login(dto: LoginRequest) {
     const { identifier, password } = dto;
 
     const user = await this.prismaService.user.findFirst({
@@ -85,12 +79,10 @@ export class AuthService {
       throw new NotFoundException('Invalid credentials');
     }
 
-    return this.auth(res, user.id);
+    return this.generateTokens(user.id);
   }
 
-  async logout(res: Response) {
-    this.setCookie(res, 'refreshToken', new Date(0));
-
+  async logout() {
     return true;
   }
 
@@ -106,14 +98,6 @@ export class AuthService {
     }
 
     return user;
-  }
-
-  private auth(res: Response, id: string) {
-    const { accessToken, refreshToken } = this.generateTokens(id);
-
-    this.setCookie(res, refreshToken, new Date(Date.now() + 60 * 60 * 24 * 7));
-
-    return { accessToken };
   }
 
   private generateTokens(id: string) {
@@ -133,40 +117,26 @@ export class AuthService {
     };
   }
 
-  async refresh(req: Request, res: Response) {
-    const refreshToken = req.cookies['refreshToken'];
-
+  async refresh(refreshToken: string) {
     if (!refreshToken) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
     const payload: JwtPayload = await this.jwtService.verifyAsync(refreshToken);
 
-    if (payload) {
-      const user = await this.prismaService.user.findUnique({
-        where: {
-          id: payload.id,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      return this.auth(res, user.id);
-    }
-  }
-
-  private setCookie(res: Response, value: string, expires: Date) {
-    res.cookie('refreshToken', value, {
-      httpOnly: true,
-      domain: this.COOKIE_DOMAIN,
-      expires,
-      secure: !isDev(this.configService),
-      sameSite: isDev(this.configService) ? 'none' : 'lax',
+    const user = await this.prismaService.user.findUnique({
+      where: {
+        id: payload.id,
+      },
+      select: {
+        id: true,
+      },
     });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.generateTokens(user.id);
   }
 }

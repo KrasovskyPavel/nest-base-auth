@@ -23,10 +23,22 @@ import {
 } from '@nestjs/swagger';
 import { AuthResponse } from './dto/auth.dto';
 import { AuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
+import { isDevEnvironment } from 'src/utils/isDevEnvironment.util';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private static readonly REFRESH_TOKEN_COOKIE_MAX_AGE_MS =
+    60 * 60 * 24 * 7 * 1000; // 7 days in milliseconds
+
+  private readonly COOKIE_DOMAIN: string;
+
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {
+    this.COOKIE_DOMAIN = configService.getOrThrow<string>('COOKIE_DOMAIN');
+  }
 
   @ApiOperation({
     summary: 'Register user',
@@ -41,7 +53,9 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Body() dto: RegisterRequest,
   ) {
-    return await this.authService.register(res, dto);
+    const { accessToken, refreshToken } = await this.authService.register(dto);
+    this.setCookie(res, refreshToken, this.getRefreshTokenExpirationDate());
+    return { accessToken };
   }
 
   @ApiOperation({
@@ -57,7 +71,9 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Body() dto: LoginRequest,
   ) {
-    return await this.authService.login(res, dto);
+    const { accessToken, refreshToken } = await this.authService.login(dto);
+    this.setCookie(res, refreshToken, this.getRefreshTokenExpirationDate());
+    return { accessToken };
   }
 
   @ApiOperation({
@@ -72,7 +88,11 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    return await this.authService.refresh(req, res);
+    const refreshToken = req.cookies['refreshToken'];
+    const { accessToken, refreshToken: newRefreshToken } =
+      await this.authService.refresh(refreshToken);
+    this.setCookie(res, newRefreshToken, this.getRefreshTokenExpirationDate());
+    return { accessToken };
   }
 
   @ApiOperation({
@@ -81,7 +101,24 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Res({ passthrough: true }) res: Response) {
-    return await this.authService.logout(res);
+    this.setCookie(res, 'refreshToken', new Date(0));
+    return await this.authService.logout();
+  }
+
+  private getRefreshTokenExpirationDate(): Date {
+    return new Date(
+      Date.now() + AuthController.REFRESH_TOKEN_COOKIE_MAX_AGE_MS,
+    );
+  }
+
+  private setCookie(res: Response, value: string, expires: Date) {
+    res.cookie('refreshToken', value, {
+      httpOnly: true,
+      domain: this.COOKIE_DOMAIN,
+      expires,
+      secure: !isDevEnvironment(this.configService),
+      sameSite: isDevEnvironment(this.configService) ? 'none' : 'lax',
+    });
   }
 
   @UseGuards(AuthGuard('jwt'))
