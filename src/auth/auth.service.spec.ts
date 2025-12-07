@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { UserRepository } from 'src/repositories/user.repository';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { RegisterRequest } from './dto/register.dto';
@@ -16,16 +16,16 @@ jest.mock('argon2');
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prismaService: PrismaService;
+  let userRepository: UserRepository;
   let configService: ConfigService;
   let jwtService: JwtService;
 
-  const mockPrismaService = {
-    user: {
-      findFirst: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-    },
+  const mockUserRepository = {
+    findByLoginOrEmail: jest.fn(),
+    findByLoginOrEmailWithPassword: jest.fn(),
+    findById: jest.fn(),
+    findByIdSelectId: jest.fn(),
+    create: jest.fn(),
   };
 
   const mockConfigService = {
@@ -50,8 +50,8 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         {
-          provide: PrismaService,
-          useValue: mockPrismaService,
+          provide: UserRepository,
+          useValue: mockUserRepository,
         },
         {
           provide: ConfigService,
@@ -65,7 +65,7 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prismaService = module.get<PrismaService>(PrismaService);
+    userRepository = module.get<UserRepository>(UserRepository);
     configService = module.get<ConfigService>(ConfigService);
     jwtService = module.get<JwtService>(JwtService);
 
@@ -97,11 +97,11 @@ describe('AuthService', () => {
     };
 
     it('should register a new user successfully', async () => {
-      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockUserRepository.findByLoginOrEmail.mockResolvedValue(null);
 
       (argon2.hash as jest.Mock).mockResolvedValue('hashed-password');
 
-      mockPrismaService.user.create.mockResolvedValue(createdUser);
+      mockUserRepository.create.mockResolvedValue(createdUser);
 
       mockJwtService.sign
         .mockReturnValueOnce('access-token-123')
@@ -114,20 +114,17 @@ describe('AuthService', () => {
         refreshToken: 'refresh-token-456',
       });
 
-      expect(prismaService.user.findFirst).toHaveBeenCalledWith({
-        where: {
-          OR: [{ login: 'testuser' }, { email: 'test@example.com' }],
-        },
-      });
+      expect(userRepository.findByLoginOrEmail).toHaveBeenCalledWith(
+        'testuser',
+        'test@example.com',
+      );
 
-      expect(prismaService.user.create).toHaveBeenCalledWith({
-        data: {
-          login: 'testuser',
-          email: 'test@example.com',
-          password: 'hashed-password',
-          age: 20,
-          description: 'test description',
-        },
+      expect(userRepository.create).toHaveBeenCalledWith({
+        login: 'testuser',
+        email: 'test@example.com',
+        password: 'hashed-password',
+        age: 20,
+        description: 'test description',
       });
 
       expect(jwtService.sign).toHaveBeenCalledTimes(2);
@@ -139,7 +136,7 @@ describe('AuthService', () => {
         login: 'testuser',
         email: 'test@example.com',
       };
-      mockPrismaService.user.findFirst.mockResolvedValue(existingUser);
+      mockUserRepository.findByLoginOrEmail.mockResolvedValue(existingUser);
 
       await expect(service.register(mockDto)).rejects.toThrow(
         ConflictException,
@@ -149,7 +146,7 @@ describe('AuthService', () => {
         'User already exist',
       );
 
-      expect(prismaService.user.create).not.toHaveBeenCalled();
+      expect(userRepository.create).not.toHaveBeenCalled();
     });
   });
 
@@ -165,7 +162,9 @@ describe('AuthService', () => {
     };
 
     it('should login user successfully with correct credentials', async () => {
-      mockPrismaService.user.findFirst.mockResolvedValue(foundUser);
+      mockUserRepository.findByLoginOrEmailWithPassword.mockResolvedValue(
+        foundUser,
+      );
 
       (argon2.verify as jest.Mock).mockResolvedValue(true);
 
@@ -180,15 +179,9 @@ describe('AuthService', () => {
         refreshToken: 'refresh-token-456',
       });
 
-      expect(prismaService.user.findFirst).toHaveBeenCalledWith({
-        where: {
-          OR: [{ login: 'testuser' }, { email: 'testuser' }],
-        },
-        select: {
-          id: true,
-          password: true,
-        },
-      });
+      expect(
+        userRepository.findByLoginOrEmailWithPassword,
+      ).toHaveBeenCalledWith('testuser');
 
       expect(argon2.verify).toHaveBeenCalledWith(
         'hashed-password-from-db',
@@ -199,7 +192,7 @@ describe('AuthService', () => {
     });
 
     it('should throw NotFoundException if user not found', async () => {
-      mockPrismaService.user.findFirst.mockResolvedValue(null);
+      mockUserRepository.findByLoginOrEmailWithPassword.mockResolvedValue(null);
 
       await expect(service.login(mockDto)).rejects.toThrow(NotFoundException);
 
@@ -209,7 +202,9 @@ describe('AuthService', () => {
     });
 
     it('should throw NotFoundException if password is incorrect', async () => {
-      mockPrismaService.user.findFirst.mockResolvedValue(foundUser);
+      mockUserRepository.findByLoginOrEmailWithPassword.mockResolvedValue(
+        foundUser,
+      );
 
       (argon2.verify as jest.Mock).mockResolvedValue(false);
 
@@ -249,20 +244,16 @@ describe('AuthService', () => {
     };
 
     it('should return user if found', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockUserRepository.findById.mockResolvedValue(mockUser);
 
       const result = await service.validate('user-id-123');
 
       expect(result).toEqual(mockUser);
-      expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-        where: {
-          id: 'user-id-123',
-        },
-      });
+      expect(userRepository.findById).toHaveBeenCalledWith('user-id-123');
     });
 
     it('should throw NotFoundException if user not found', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockUserRepository.findById.mockResolvedValue(null);
 
       await expect(service.validate('non-existent-id')).rejects.toThrow(
         NotFoundException,
@@ -284,7 +275,7 @@ describe('AuthService', () => {
     it('should refresh tokens successfully', async () => {
       mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
 
-      mockPrismaService.user.findUnique.mockResolvedValue({
+      mockUserRepository.findByIdSelectId.mockResolvedValue({
         id: 'user-id-123',
       });
 
@@ -303,14 +294,9 @@ describe('AuthService', () => {
         'valid-refresh-token',
       );
 
-      expect(prismaService.user.findUnique).toHaveBeenCalledWith({
-        where: {
-          id: 'user-id-123',
-        },
-        select: {
-          id: true,
-        },
-      });
+      expect(userRepository.findByIdSelectId).toHaveBeenCalledWith(
+        'user-id-123',
+      );
 
       expect(jwtService.sign).toHaveBeenCalledTimes(2);
     });
@@ -328,7 +314,7 @@ describe('AuthService', () => {
     it('should throw NotFoundException if user not found after token verification', async () => {
       mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
 
-      mockPrismaService.user.findUnique.mockResolvedValue(null);
+      mockUserRepository.findByIdSelectId.mockResolvedValue(null);
 
       await expect(service.refresh(mockRefreshToken)).rejects.toThrow(
         NotFoundException,

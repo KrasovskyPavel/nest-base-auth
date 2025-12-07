@@ -4,13 +4,13 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { RegisterRequest } from './dto/register.dto';
 import { hash, verify } from 'argon2';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { JwtPayload } from './interfaces/jwt.interface';
 import { LoginRequest } from './dto/login.dto';
+import { UserRepository } from 'src/repositories/user.repository';
 
 @Injectable()
 export class AuthService {
@@ -18,7 +18,7 @@ export class AuthService {
   private readonly JWT_REFRESH_TOKEN_TTL: string;
 
   constructor(
-    private readonly prismaService: PrismaService,
+    private readonly userRepository: UserRepository,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
   ) {
@@ -33,24 +33,21 @@ export class AuthService {
   async register(dto: RegisterRequest) {
     const { login, email, password, age, description } = dto;
 
-    const existUser = await this.prismaService.user.findFirst({
-      where: {
-        OR: [{ login: login }, { email: email }],
-      },
-    });
+    const existUser = await this.userRepository.findByLoginOrEmail(
+      login,
+      email,
+    );
 
     if (existUser) {
       throw new ConflictException('User already exist');
     }
 
-    const user = await this.prismaService.user.create({
-      data: {
-        login,
-        email,
-        password: await hash(password),
-        age,
-        description,
-      },
+    const user = await this.userRepository.create({
+      login,
+      email,
+      password: await hash(password),
+      age,
+      description,
     });
 
     return this.generateTokens(user.id);
@@ -59,15 +56,8 @@ export class AuthService {
   async login(dto: LoginRequest) {
     const { identifier, password } = dto;
 
-    const user = await this.prismaService.user.findFirst({
-      where: {
-        OR: [{ login: identifier }, { email: identifier }],
-      },
-      select: {
-        id: true,
-        password: true,
-      },
-    });
+    const user =
+      await this.userRepository.findByLoginOrEmailWithPassword(identifier);
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -87,11 +77,7 @@ export class AuthService {
   }
 
   async validate(id: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: {
-        id,
-      },
-    });
+    const user = await this.userRepository.findById(id);
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -124,14 +110,7 @@ export class AuthService {
 
     const payload: JwtPayload = await this.jwtService.verifyAsync(refreshToken);
 
-    const user = await this.prismaService.user.findUnique({
-      where: {
-        id: payload.id,
-      },
-      select: {
-        id: true,
-      },
-    });
+    const user = await this.userRepository.findByIdSelectId(payload.id);
 
     if (!user) {
       throw new NotFoundException('User not found');

@@ -1,17 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProfileService } from './profile.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { UserRepository } from 'src/repositories/user.repository';
 import { GetUsersDto } from './dto/get-users.dto';
 import { DEFAULT_PAGE_SIZE } from 'src/common/constants';
 
 describe('ProfileService', () => {
   let service: ProfileService;
-  let prismaService: PrismaService;
+  let userRepository: UserRepository;
 
-  const mockPrismaService = {
-    user: {
-      findMany: jest.fn(),
-    },
+  const mockUserRepository = {
+    findMany: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -19,14 +17,14 @@ describe('ProfileService', () => {
       providers: [
         ProfileService,
         {
-          provide: PrismaService,
-          useValue: mockPrismaService,
+          provide: UserRepository,
+          useValue: mockUserRepository,
         },
       ],
     }).compile();
 
     service = module.get<ProfileService>(ProfileService);
-    prismaService = module.get<PrismaService>(PrismaService);
+    userRepository = module.get<UserRepository>(UserRepository);
 
     jest.clearAllMocks();
   });
@@ -59,17 +57,17 @@ describe('ProfileService', () => {
 
     it('should return all users without filters', async () => {
       const dto: GetUsersDto = {};
-      mockPrismaService.user.findMany.mockResolvedValue(mockUsers);
+      mockUserRepository.findMany.mockResolvedValue(mockUsers);
 
       const result = await service.getAllUsers(dto);
 
       expect(result).toEqual(mockUsers);
-      expect(prismaService.user.findMany).toHaveBeenCalledWith({
-        where: {},
+      expect(userRepository.findMany).toHaveBeenCalledWith({
+        where: undefined,
         take: DEFAULT_PAGE_SIZE,
         skip: undefined,
       });
-      expect(prismaService.user.findMany).toHaveBeenCalledTimes(1);
+      expect(userRepository.findMany).toHaveBeenCalledTimes(1);
     });
 
     it('should return users with pagination (limit and skip)', async () => {
@@ -77,13 +75,13 @@ describe('ProfileService', () => {
         limit: 10,
         skip: 5,
       };
-      mockPrismaService.user.findMany.mockResolvedValue(mockUsers);
+      mockUserRepository.findMany.mockResolvedValue(mockUsers);
 
       const result = await service.getAllUsers(dto);
 
       expect(result).toEqual(mockUsers);
-      expect(prismaService.user.findMany).toHaveBeenCalledWith({
-        where: {},
+      expect(userRepository.findMany).toHaveBeenCalledWith({
+        where: undefined,
         take: 10,
         skip: 5,
       });
@@ -94,12 +92,12 @@ describe('ProfileService', () => {
         search: 'user1',
       };
       const filteredUsers = [mockUsers[0]];
-      mockPrismaService.user.findMany.mockResolvedValue(filteredUsers);
+      mockUserRepository.findMany.mockResolvedValue(filteredUsers);
 
       const result = await service.getAllUsers(dto);
 
       expect(result).toEqual(filteredUsers);
-      expect(prismaService.user.findMany).toHaveBeenCalledWith({
+      expect(userRepository.findMany).toHaveBeenCalledWith({
         where: {
           OR: [
             {
@@ -126,12 +124,12 @@ describe('ProfileService', () => {
         search: 'user2@test.com',
       };
       const filteredUsers = [mockUsers[1]];
-      mockPrismaService.user.findMany.mockResolvedValue(filteredUsers);
+      mockUserRepository.findMany.mockResolvedValue(filteredUsers);
 
       const result = await service.getAllUsers(dto);
 
       expect(result).toEqual(filteredUsers);
-      expect(prismaService.user.findMany).toHaveBeenCalledWith({
+      expect(userRepository.findMany).toHaveBeenCalledWith({
         where: {
           OR: [
             {
@@ -159,12 +157,12 @@ describe('ProfileService', () => {
         limit: 20,
         skip: 10,
       };
-      mockPrismaService.user.findMany.mockResolvedValue(mockUsers);
+      mockUserRepository.findMany.mockResolvedValue(mockUsers);
 
       const result = await service.getAllUsers(dto);
 
       expect(result).toEqual(mockUsers);
-      expect(prismaService.user.findMany).toHaveBeenCalledWith({
+      expect(userRepository.findMany).toHaveBeenCalledWith({
         where: {
           OR: [
             {
@@ -188,12 +186,12 @@ describe('ProfileService', () => {
 
     it('should return empty array when no users found', async () => {
       const dto: GetUsersDto = {};
-      mockPrismaService.user.findMany.mockResolvedValue([]);
+      mockUserRepository.findMany.mockResolvedValue([]);
 
       const result = await service.getAllUsers(dto);
 
       expect(result).toEqual([]);
-      expect(prismaService.user.findMany).toHaveBeenCalledTimes(1);
+      expect(userRepository.findMany).toHaveBeenCalledTimes(1);
     });
   });
 });

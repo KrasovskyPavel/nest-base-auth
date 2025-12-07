@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { GetUsersDto } from './dto/get-users.dto';
 import { DEFAULT_PAGE_SIZE } from 'src/common/constants';
+import { UserRepository } from 'src/repositories/user.repository';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(private readonly userRepository: UserRepository) {}
 
   async getAllUsers(getUsersDto: GetUsersDto) {
     const where = getUsersDto.search
@@ -25,9 +25,9 @@ export class ProfileService {
             },
           ],
         }
-      : {};
+      : undefined;
 
-    return this.prismaService.user.findMany({
+    return this.userRepository.findMany({
       where,
       take: getUsersDto.limit ?? DEFAULT_PAGE_SIZE,
       skip: getUsersDto.skip,
