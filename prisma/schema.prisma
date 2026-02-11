@@ -14,6 +14,21 @@ model User {
   password    String
   age         Int
   description String?
+
+  avatars     Avatar[]
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Avatar {
+  id String @id @default(uuid())
+  path String
+  userId String
+  isMain Boolean @default(true)
+  
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
