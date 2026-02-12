@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { User } from '@prisma/client';
+import type { UserWithLastAvatar } from 'src/profile/interfaces/user.interface';
 
 @Injectable()
 export class UserRepository {
@@ -70,5 +71,71 @@ export class UserRepository {
     skip?: number;
   }): Promise<User[]> {
     return this.prismaService.user.findMany(options);
+  }
+
+  async findManyActiveUsers(options: {
+    minAge?: number;
+    maxAge?: number;
+    take?: number;
+    skip?: number;
+  }): Promise<UserWithLastAvatar[]> {
+    const userIdsWithManyActiveAvatars =
+      await this.prismaService.avatar.groupBy({
+        by: ['userId'],
+        where: { isActive: true },
+        _count: { id: true },
+        having: {
+          userId: { _count: { gte: 2 } },
+        },
+      });
+
+    const userIds = userIdsWithManyActiveAvatars.map((r) => r.userId);
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const where: {
+      id: { in: string[] };
+      AND: Array<{ description?: { not: null | string } }>;
+      age?: { gte?: number; lte?: number };
+    } = {
+      id: { in: userIds },
+      AND: [{ description: { not: null } }, { description: { not: '' } }],
+    };
+
+    if (options.minAge != null || options.maxAge != null) {
+      where.age = {};
+      if (options.minAge != null) where.age.gte = options.minAge;
+      if (options.maxAge != null) where.age.lte = options.maxAge;
+    }
+
+    const rows = await this.prismaService.user.findMany({
+      where,
+      take: options.take,
+      skip: options.skip,
+      select: {
+        id: true,
+        login: true,
+        email: true,
+        age: true,
+        description: true,
+        avatars: {
+          where: { isActive: true },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            path: true,
+            isActive: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    return rows.map(({ avatars, ...user }) => ({
+      ...user,
+      lastAvatar: avatars[0] ?? null,
+    }));
   }
 }

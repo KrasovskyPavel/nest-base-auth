@@ -25,7 +25,7 @@ model Avatar {
   id String @id @default(uuid())
   path String
   userId String
-  isMain Boolean @default(true)
+  isActive Boolean @default(true)
   
   user User @relation(fields: [userId], references: [id])
 
