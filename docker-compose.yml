@@ -31,6 +31,18 @@ services:
     networks:
       - nestjs_auth
 
+  redis:
+    image: redis:alpine3.16
+    container_name: redis-wsbe
+    env_file: .env
+    command: >
+      --requirepass ${REDIS_PASSWORD} --port ${REDIS_PORT}
+    ports:
+      - '6379:6379'
+    restart: unless-stopped
+    networks:
+      - nestjs_auth
+
 volumes:
   postgres_data:
   minio_storage:

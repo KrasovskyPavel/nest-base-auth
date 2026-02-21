@@ -20,6 +20,7 @@ import { ReqField } from 'src/common/decorators/req-field.decorator';
 import type { RequestUser } from 'src/auth/interfaces/user.interface';
 import type { IUploadedMulterFile } from 'src/providers/s3/interfaces/upload-file.interface';
 import { GetActiveUsersDto } from './dto/get-active-users.dto';
+import { ProfileCacheInterceptor } from './interceptors/profile-cache.interceptor';
 
 @Controller('profile')
 export class ProfileController {
@@ -29,6 +30,7 @@ export class ProfileController {
   ) {}
 
   @Authorization()
+  @UseInterceptors(ProfileCacheInterceptor)
   @Get('me')
   @HttpCode(HttpStatus.OK)
   me(@ReqField('user') user: RequestUser) {
@@ -36,6 +38,7 @@ export class ProfileController {
   }
 
   @Authorization()
+  @UseInterceptors(ProfileCacheInterceptor)
   @Get('get-all-users')
   @HttpCode(HttpStatus.OK)
   async getAllUsers(@Query() getUsersDto: GetUsersDto) {
