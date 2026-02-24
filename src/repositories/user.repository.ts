@@ -138,4 +138,33 @@ export class UserRepository {
       lastAvatar: avatars[0] ?? null,
     }));
   }
+
+  async transferBalance(
+    fromUserId: string,
+    toUserId: string,
+    amount: number,
+  ): Promise<void> {
+    await this.prismaService.$transaction(async (tx) => {
+      const from = await tx.user.findUniqueOrThrow({
+        where: { id: fromUserId },
+        select: { balance: true },
+      });
+      const fromBalance = Number(from.balance);
+      if (fromBalance < amount) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+      await tx.user.findUniqueOrThrow({
+        where: { id: toUserId },
+        select: { id: true },
+      });
+      await tx.user.update({
+        where: { id: fromUserId },
+        data: { balance: { decrement: amount } },
+      });
+      await tx.user.update({
+        where: { id: toUserId },
+        data: { balance: { increment: amount } },
+      });
+    });
+  }
 }

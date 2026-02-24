@@ -16,6 +16,8 @@ model User {
   description String?
 
   avatars     Avatar[]
+
+  balance     Decimal  @default(0) @db.Decimal(10, 2)
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
