@@ -6,6 +6,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Logger,
   Param,
   Post,
   Query,
@@ -33,6 +34,8 @@ import {
 
 @Controller('profile')
 export class ProfileController {
+  private readonly logger = new Logger(ProfileController.name);
+
   constructor(
     private readonly profileService: ProfileService,
     private readonly avatarService: AvatarService,
@@ -43,6 +46,7 @@ export class ProfileController {
   @Get('me')
   @HttpCode(HttpStatus.OK)
   me(@ReqField('user') user: RequestUser) {
+    this.logger.log(`GET /profile/me: returning profile (userId=${user.id})`);
     return user;
   }
 
@@ -51,6 +55,9 @@ export class ProfileController {
   @Get('get-all-users')
   @HttpCode(HttpStatus.OK)
   async getAllUsers(@Query() getUsersDto: GetUsersDto) {
+    this.logger.log(
+      `GET /profile/get-all-users: returning all users (cache miss, query: limit=${getUsersDto.limit ?? 'default'}, skip=${getUsersDto.skip ?? 0})`,
+    );
     return this.profileService.getAllUsers(getUsersDto);
   }
 
@@ -58,6 +65,9 @@ export class ProfileController {
   @Get('get-active-users')
   @HttpCode(HttpStatus.OK)
   async getActiveUsers(@Query() getActiveUsersDto: GetActiveUsersDto) {
+    this.logger.log(
+      `GET /profile/get-active-users: minAge=${getActiveUsersDto.minAge ?? '-'}, maxAge=${getActiveUsersDto.maxAge ?? '-'}, limit=${getActiveUsersDto.limit ?? 'default'}, skip=${getActiveUsersDto.skip ?? 0}`,
+    );
     return this.profileService.getActiveUsers(getActiveUsersDto);
   }
 
@@ -72,6 +82,9 @@ export class ProfileController {
     if (!file) {
       throw new BadRequestException('File is required');
     }
+    this.logger.log(
+      `POST /profile/avatars: uploading avatar for userId=${user.id}`,
+    );
     return this.avatarService.uploadAvatar(user.id, file);
   }
 
@@ -139,6 +152,13 @@ export class ProfileController {
     @ReqField('user') user: RequestUser,
     @Body() dto: TransferBalanceDto,
   ) {
-    return this.profileService.transferBalance(user.id, dto);
+    this.logger.log(
+      `POST /profile/transfer: userId=${user.id}, toUserId=${dto.toUserId}, amount=${dto.amount}`,
+    );
+    const result = await this.profileService.transferBalance(user.id, dto);
+    this.logger.log(
+      `POST /profile/transfer: success userId=${user.id} to toUserId=${dto.toUserId}, amount=${dto.amount}`,
+    );
+    return result;
   }
 }

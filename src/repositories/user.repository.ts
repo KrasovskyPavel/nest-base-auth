@@ -167,4 +167,11 @@ export class UserRepository {
       });
     });
   }
+
+  async resetAllBalances(): Promise<number> {
+    const result = await this.prismaService.user.updateMany({
+      data: { balance: 0 },
+    });
+    return result.count;
+  }
 }

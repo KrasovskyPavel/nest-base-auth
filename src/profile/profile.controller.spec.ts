@@ -2,10 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
 import { GetUsersDto } from './dto/get-users.dto';
+import { Decimal } from 'generated/prisma/runtime/library';
 
 describe('ProfileController', () => {
   let controller: ProfileController;
-  let profileService: ProfileService;
 
   const mockProfileService = {
     getAllUsers: jest.fn(),
@@ -20,6 +20,7 @@ describe('ProfileController', () => {
     description: 'Test description',
     createdAt: new Date(),
     updatedAt: new Date(),
+    balance: new Decimal('100'),
   };
 
   beforeEach(async () => {
@@ -34,7 +35,6 @@ describe('ProfileController', () => {
     }).compile();
 
     controller = module.get<ProfileController>(ProfileController);
-    profileService = module.get<ProfileService>(ProfileService);
 
     jest.clearAllMocks();
   });
@@ -44,14 +44,14 @@ describe('ProfileController', () => {
   });
 
   describe('me', () => {
-    it('should return user from ReqField decorator', async () => {
-      const result = await controller.me(mockUser);
+    it('should return user from ReqField decorator', () => {
+      const result = controller.me(mockUser);
 
       expect(result).toEqual(mockUser);
       expect(result).toBe(mockUser);
     });
 
-    it('should return user with all properties', async () => {
+    it('should return user with all properties', () => {
       const testUser = {
         id: '123',
         login: 'john_doe',
@@ -61,9 +61,10 @@ describe('ProfileController', () => {
         description: 'Software developer',
         createdAt: new Date('2024-01-01'),
         updatedAt: new Date('2024-01-02'),
+        balance: new Decimal('100'),
       };
 
-      const result = await controller.me(testUser);
+      const result = controller.me(testUser);
 
       expect(result).toHaveProperty('id', '123');
       expect(result).toHaveProperty('login', 'john_doe');
@@ -85,8 +86,8 @@ describe('ProfileController', () => {
       const result = await controller.getAllUsers(dto);
 
       expect(result).toEqual(mockUsers);
-      expect(profileService.getAllUsers).toHaveBeenCalledWith(dto);
-      expect(profileService.getAllUsers).toHaveBeenCalledTimes(1);
+      expect(mockProfileService.getAllUsers).toHaveBeenCalledWith(dto);
+      expect(mockProfileService.getAllUsers).toHaveBeenCalledTimes(1);
     });
 
     it('should handle empty DTO', async () => {
@@ -97,7 +98,7 @@ describe('ProfileController', () => {
       const result = await controller.getAllUsers(dto);
 
       expect(result).toEqual(mockUsers);
-      expect(profileService.getAllUsers).toHaveBeenCalledWith(dto);
+      expect(mockProfileService.getAllUsers).toHaveBeenCalledWith(dto);
     });
 
     it('should handle pagination parameters', async () => {
@@ -111,7 +112,7 @@ describe('ProfileController', () => {
       const result = await controller.getAllUsers(dto);
 
       expect(result).toEqual(mockUsers);
-      expect(profileService.getAllUsers).toHaveBeenCalledWith({
+      expect(mockProfileService.getAllUsers).toHaveBeenCalledWith({
         limit: 5,
         skip: 10,
       });
@@ -124,7 +125,7 @@ describe('ProfileController', () => {
       const result = await controller.getAllUsers(dto);
 
       expect(result).toEqual([]);
-      expect(profileService.getAllUsers).toHaveBeenCalledWith(dto);
+      expect(mockProfileService.getAllUsers).toHaveBeenCalledWith(dto);
     });
   });
 });
