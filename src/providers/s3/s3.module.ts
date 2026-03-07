@@ -13,8 +13,8 @@ import { S3Service } from './s3.service';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         return new AWS.S3({
-          endpoint: 'http://127.0.0.1:9000',
-          region: 'ru-central1',
+          endpoint: configService.getOrThrow<string>('S3_ENDPOINT'),
+          region: configService.getOrThrow<string>('S3_REGION'),
           credentials: {
             accessKeyId: configService.getOrThrow<string>('MINIO_ROOT_USER'),
             secretAccessKey: configService.getOrThrow<string>(
