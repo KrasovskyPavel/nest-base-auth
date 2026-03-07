@@ -5,7 +5,9 @@ import { setupSwagger } from './utils/swagger.util';
 import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['log', 'error', 'warn', 'debug'],
+  });
 
   app.use(cookieParser());
 

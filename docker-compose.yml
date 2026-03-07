@@ -15,8 +15,37 @@ services:
     networks:
       - nestjs_auth
 
+  minio:
+    container_name: minio
+    image: minio/minio
+    command: server --console-address ":9001" /data
+    restart: always
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_storage:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    networks:
+      - nestjs_auth
+
+  redis:
+    image: redis:alpine3.16
+    container_name: redis-wsbe
+    env_file: .env
+    command: >
+      --requirepass ${REDIS_PASSWORD} --port ${REDIS_PORT}
+    ports:
+      - '6379:6379'
+    restart: unless-stopped
+    networks:
+      - nestjs_auth
+
 volumes:
   postgres_data:
+  minio_storage:
 
 networks:
   nestjs_auth:
