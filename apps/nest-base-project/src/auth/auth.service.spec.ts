@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
-import { UserRepository } from 'src/repositories/user.repository';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { RegisterRequest } from './dto/register.dto';
@@ -12,6 +11,7 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { LoginRequest } from './dto/login.dto';
+import { UserRepository } from '../repositories/user.repository';
 
 jest.mock('argon2');
 
